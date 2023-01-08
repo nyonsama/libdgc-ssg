@@ -1,0 +1,185 @@
+goal
+write post in markdown or tsx or package
+(basically) read post without javascript
+not spa
+pure static
+use react
+post owns its assets
+
+qustion
+html?
+package?
+
+
+webpack bundle -> js
+custom script ssg -> html
+insert ssghtml to template
+
+用webpack处理编译脚本 -> no
+
+1 all -> webpack -> js and assets
+  ssr -> html
+
+for md and html. just import a path
+
+
+
+just bundle all
+react router
+
+其他页面写死，只有post读目录自动生成
+多页面
+不使用router
+一个脚本用来生成routes
+
+
+router
+post单独处理
+
+md 元数据
+static props
+
+
+
+
+
+路由
+
+
+
+ssg:
+
+生成所有路径 wip
+渲染出html render
+生成ssgdata,html里插一份，json里放一份,每个页面一个json
+打包js、css、图片... webpack
+把静态资源放进html HtmlWebpackPlugin
+搬markdown资源 CopyWebpackPlugin
+
+
+
+
+
+dist/
+
+json路径为${path}.json
+根目录为index.json
+eg.
+
+xxx.bundle.js
+index.json
+index.html
+assets/...
+asdf/index.html
+asdf/zxcv.html
+what.json
+what/index.html
+what/ass.html
+what/ass.json
+blog/posts/hajimeni.html
+blog/posts/hajimeni.json
+blog/posts/post-with-assets.json
+blog/posts/post-with-assets/index.html
+blog/posts/post-with-assets/assets/asdf.html
+blog/posts/post-with-assets/assets/asdf.png
+
+
+
+渲染markdown
+
+每个路由可以带一个getStaticProps
+
+
+ssg服务端直接跑getStaticProps,把数据插进html、生成json文件
+ssg客户端
+	useStaticData？组件不好复用
+	useSWR？每次用都要传入路径
+	获得数据的代码写在最外面然后传props？
+csr 照样用json
+
+只能用钩子,不然异步请求不好处理
+选择性请求
+三种数据来源
+	ssg从最外面传进来
+	client 从html里嵌的数据获得
+		请求json
+结论：使用hook+context
+hoc也不是不行，就是麻烦,但是不会侵入组件代码
+
+
+
+如果要给页面绑定一个getStaticProps,只能写两遍路由
+文件系统路由太难实现
+
+ 
+纯静态网站，如果有比较大的数据，客户端需要异步获取
+用json文件模拟api路由，staticApi
+单独写脚本生成
+单独写api库
+
+
+手动代码分割
+test:使用top level await 进行代码分割
+
+把html的依赖抽象出来，不用html plugin
+
+
+
+
+
+
+静态数据输出到固定的目录,开发时csr要用json的话就配置一下webpack-dev-server,在正确的路由提供json文件
+不用软链接
+
+
+scripts:
+
+这个脚本用于处理动态的,webpack管不了的资产
+generate-static-data.ts 输出json 每次输出json都把这个文件重新构建一遍是可以接受的    搬运markdown的私有assets 理论上可以手动实现一个更新时间一样就不copy的copy函数
+
+不用脚本,只用webpack输出js bundle
+
+ssg.ts 输出html 往html里面插脚本  输出之前先把客户端js打好包
+
+dist.ts 不导入其他代码 把文件移动到dist
+在跑这个脚本之前build/ssg里面的目录结构已经是完整的了(除了_data)
+
+
+command:
+build 做好启动脚本和csr的准备
+dev: 启动csr服务器
+ssg: 构建所有会用到的bundle,然后移动到dist
+
+
+有哪些bundle?脚本,客户端(development),客户端(production)
+ssg脚本得单拿出来看
+
+
+
+分割任意组件很难,不过按页面分割理论上可行
+
+
+
+
+关于markdown
+一是动态导入
+二是使用比较通用的getStaticData
+
+动态导入:
+写一个函数用来提供context,包含是否在ssg,是否在水合,当前页面的path
+在blog.tsx里面判断当前context,
+	当前环境是ssg就全局await import(xxx.md)
+	当前环境是浏览器
+		正在水合就根据当前path全局await或异步导入
+		没有在水合就不await,异步导入
+		context初始值为正在水合
+	有个问题,每个要ssr+分割的组件都要知道它会在哪个路由被水合
+		绕过:在放router的文件里动态导入每个页面.tsx,这样可以在这里先用全局变量设置要水合哪个路由,然后只同步导入要水合的路由
+		缺点是如果只有一个组件要ssr+分割,整个页面都要分割出去
+		将"第一次加载模块"视作第一次渲染
+
+在server.tsx里面动态导入React组件,避免全局的代码先执行
+
+getStaticData:
+生成psot列表要用
+或者不用,单独写个脚本生成json+往html里插数据,然后dev server监视build目录来实现刷新

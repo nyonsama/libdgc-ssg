@@ -5,10 +5,25 @@ export interface GetStaticDataContext {
 }
 export type GetStaticData<T> = (context: GetStaticDataContext) => Promise<T>;
 
-export interface SSGRoutes {
+// todo: 可以考虑加个index:boolean，或者手动给path加trailling slash
+type RouteInfo =
+  | {
+      type: "page";
+      getStaticData?: GetStaticData<any>;
+      children?: SSGRoutes[] | (() => Promise<SSGRoutes[]>);
+    }
+  | {
+      type: "dummy";
+      children?: SSGRoutes[] | (() => Promise<SSGRoutes[]>);
+    }
+  | {
+      type: "asset";
+      dirPath: string;
+    };
+
+export type SSGRoutes = {
   path: string;
-  getStaticData?: GetStaticData<any>;
-  children?: SSGRoutes[] | (() => Promise<SSGRoutes[]>);
-}
+  // children?: SSGRoutes[] | (() => Promise<SSGRoutes[]>);
+} & RouteInfo;
 
 export type GetStaticPaths = () => Promise<SSGRoutes[]>;

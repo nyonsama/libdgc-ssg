@@ -18,7 +18,7 @@ export interface AppProps {
 
 const App = (props: AppProps) => {
   const location = useLocation();
-  console.log(location.pathname);
+  // console.log(location.pathname);
   return (
     <HelmetProvider context={props.helmetContext}>
       <Helmet>
@@ -29,7 +29,7 @@ const App = (props: AppProps) => {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/asdf" element={<Asdf />} />
-        <Route path="/blog" element={<h1>Blog Index</h1>} />
+        {/* <Route path="/blog" element={<h1>Blog Index</h1>} /> */}
         <Route path="/blog/*" element={<Blog />} />
       </Routes>
     </HelmetProvider>

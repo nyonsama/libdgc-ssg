@@ -2,6 +2,7 @@ import * as webpack from "webpack";
 import * as path from "path";
 import HtmlWebpackPlugin from "html-webpack-plugin";
 import MiniCssExtractPlugin from "mini-css-extract-plugin";
+import CopyWebpackPlugin from "copy-webpack-plugin"
 
 // todo extract css in production
 
@@ -33,7 +34,7 @@ const common: webpack.Configuration = {
 // for development
 export const csr: webpack.Configuration = {
   ...common,
-  name: "csr",
+  name: "dev",
   // mode: "development",
   devtool: "eval-source-map",
   entry: path.resolve(__dirname, "src", "entry.client.tsx"),
@@ -43,7 +44,9 @@ export const csr: webpack.Configuration = {
     path: path.resolve(__dirname, "build", "csr"),
     clean: true,
   },
-  plugins: [new HtmlWebpackPlugin()],
+  plugins: [new HtmlWebpackPlugin(),
+
+  ],
 };
 
 // todo: code split
@@ -63,6 +66,13 @@ export const ssgClient: webpack.Configuration = {
   optimization: {
     usedExports: true,
   },
+  plugins:[
+    new CopyWebpackPlugin({
+      patterns:[
+        {from:"public/*",to:"build/ssg/"}
+      ]
+    })
+  ]
   // plugins: [new webpack.EnvironmentPlugin(["NODE_ENV"])],
 };
 

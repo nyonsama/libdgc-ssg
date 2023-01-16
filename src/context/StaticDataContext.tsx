@@ -34,8 +34,8 @@ export const StaticDataProvider = (props: StaticDataProviderProps) => {
   );
 };
 
-export interface StaticDataResponse {
-  data?: any;
+export interface StaticDataResponse<T> {
+  data?: T;
   error?: {
     reason: "404" | "network";
     originalError?: Error;
@@ -44,20 +44,20 @@ export interface StaticDataResponse {
 }
 
 // 仅当在客户端导航的时候使用
-export const useStaticData = (): StaticDataResponse => {
+export const useStaticData = <T,>(): StaticDataResponse<T> => {
   const location = useLocation();
   const { staticData: initialData, ssr } = useContext(StaticDataContext);
-  const [response, setResponse] = useState<StaticDataResponse>({
+  const [response, setResponse] = useState<StaticDataResponse<T>>({
     isLoading: true,
   });
 
-  console.log("initialData:", initialData);
+  // console.log("initialData:", initialData);
   // check if initialData.path matches current path
   let match: boolean;
   if (ssr) {
     // server side
     match = true;
-  } else if (initialData?.path === location.pathname.replace(/\.html$/, "")) {
+  } else if (initialData?.path === location.pathname) {
     // not doing any navigate yet
 
     // todo:或许可以改成useLocation
@@ -72,8 +72,12 @@ export const useStaticData = (): StaticDataResponse => {
       (async () => {
         try {
           setResponse({ isLoading: true });
+          const jsonFileName =
+            location.pathname === "/"
+              ? "/index.json"
+              : location.pathname.replace(/\/$/, "") + ".json";
           // todo: 可能以后要改path
-          const res = await fetch(`/_data${location.pathname}.json`);
+          const res = await fetch(`/_data${jsonFileName}`);
           if (res.ok) {
             setResponse({ isLoading: false, data: await res.json() });
           } else if (res.status === 404) {

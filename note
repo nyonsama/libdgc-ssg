@@ -183,3 +183,15 @@ ssg脚本得单拿出来看
 getStaticData:
 生成psot列表要用
 或者不用,单独写个脚本生成json+往html里插数据,然后dev server监视build目录来实现刷新
+
+
+文件可分为这几类:
+源码 -> webpack hmr或插件
+getStaticData要处理的文件(markdown) -> webpack dev server 监视所有文件,一旦有变化就重新生成
+需要直接copy的资源(markdown的assets favicon.ico robots.txt等等) -> webpack 插件
+
+
+
+有个大问题
+
+对于csr单页面应用,静态资源一定要放到一个统一的目录下,因为别的路由都要返回唯一的那个index.html

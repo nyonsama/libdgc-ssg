@@ -12,7 +12,7 @@ export const getStaticPaths: GetStaticPaths = async () => {
     });
     if (post.assetsPath) {
       routes.push({
-        path: post.id,
+        path: post.id + "/",
         type: "asset",
         dirPath: post.assetsPath,
       });

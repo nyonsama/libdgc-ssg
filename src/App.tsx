@@ -2,8 +2,12 @@ import React from "react";
 import { HelmetProvider, Helmet, ProviderProps } from "react-helmet-async";
 import { Routes, Route, useLocation } from "react-router-dom";
 import Home from "./routes";
-import Asdf from "./routes/asdf";
 import Blog from "./routes/blog";
+import "highlight.js/styles/github-dark.css"
+import "./main.css";
+import BlogList from "./routes/bloglist";
+import BlogRoll from "./routes/blogroll";
+import About from "./routes/about";
 
 export interface AppProps {
   helmetContext?: ProviderProps["context"];
@@ -28,9 +32,11 @@ const App = (props: AppProps) => {
       </Helmet>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/asdf" element={<Asdf />} />
-        {/* <Route path="/blog" element={<h1>Blog Index</h1>} /> */}
+        <Route path="/blog" element={<BlogList />} />
+        <Route path="/blogroll" element={<BlogRoll />} />
         <Route path="/blog/*" element={<Blog />} />
+        <Route path="/about" element={<About />} />
+        {/* todo: 404 */}
       </Routes>
     </HelmetProvider>
   );

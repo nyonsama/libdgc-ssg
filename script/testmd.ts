@@ -7,6 +7,9 @@ import { matter } from "vfile-matter";
 import rehypeSlug from "rehype-slug";
 import { visit } from "unist-util-visit";
 import { toHtml } from "hast-util-to-html";
+import remarkToc from "remark-toc";
+import { u } from "unist-builder";
+import { h } from "hastscript";
 
 const md = `---
 title: asdf
@@ -15,6 +18,7 @@ zzzz: 12341
 ---
 
 # asdf!!
+## Table of contents
 ## shit
 pppp
 ## hjkl
@@ -26,6 +30,16 @@ unified()
   .use(() => (tree, file) => {
     matter(file, { strip: true });
   })
+  .use(() => (tree, file) => {
+    let tocIndex =
+      tree.children.findIndex((c) => c.type === "heading" && c.depth === 1) + 1;
+    tree.children = [
+      ...tree.children.slice(0, tocIndex),
+      u("heading", { depth: 2 as const }, [u("text", { value: "目录" })]),
+      ...tree.children.slice(tocIndex),
+    ];
+  })
+  .use(remarkToc, { heading: "目录" })
   .use(remarkRehype)
   .use(rehypeSlug)
   .use(() => (tree, file) => {
@@ -40,6 +54,29 @@ unified()
       }
     });
     file.data.toc = toc;
+  })
+  .use(() => (tree, file) => {
+    const tocHeadingIndex = tree.children.findIndex(
+      (c) => c.type === "element" && c.properties?.id === "目录"
+    );
+    if (tocHeadingIndex === -1) {
+      return;
+    }
+    const tocIndex =
+      tree.children
+        .slice(tocHeadingIndex)
+        .findIndex((c) => c.type === "element" && c.tagName === "ul") +
+      tocHeadingIndex;
+
+    tree.children = [
+      ...tree.children.slice(0, tocHeadingIndex),
+      h(
+        "div.toc-wrap",
+        tree.children.slice(tocHeadingIndex, tocIndex + 1) as any[]
+      ),
+      ...tree.children.slice(tocIndex + 1),
+    ];
+    console.log(tree.children);
   })
   .use(rehypeStringify)
   .process(md)

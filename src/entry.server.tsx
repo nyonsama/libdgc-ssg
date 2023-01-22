@@ -3,12 +3,16 @@ import * as ReactDOMServer from "react-dom/server";
 import { FilledContext } from "react-helmet-async";
 import { StaticRouter } from "react-router-dom/server";
 import App from "./App";
-import { StaticData, StaticDataProvider } from "./context/StaticDataContext";
+import {
+  StaticData,
+  StaticDataProvider,
+} from "./frame/context/StaticDataContext";
 import { GetStaticData, SSGRoutes } from "./frame";
 import fs from "fs/promises";
 import path from "path";
 import { getStaticPaths as blogPaths } from "./routes/blog.server";
 import { getStaticData as indexStaticData } from "./routes/index.server";
+import { getStaticData as blogListStaticData } from "./routes/bloglist.server";
 
 // filesystem router is too complex so i code my routes by hand
 const ssgRoutes: SSGRoutes = {
@@ -16,10 +20,12 @@ const ssgRoutes: SSGRoutes = {
   type: "page",
   getStaticData: indexStaticData,
   children: [
-    { path: "asdf", type: "page" },
+    { path: "blogroll", type: "page" },
+    { path: "about", type: "page" },
     {
-      path: "blog",
-      type: "dummy",
+      path: "blog/",
+      type: "page",
+      getStaticData: blogListStaticData,
       children: blogPaths,
     },
   ],
@@ -28,7 +34,12 @@ const ssgRoutes: SSGRoutes = {
 const outputPath = path.join(process.cwd(), "build", "ssg");
 const dataPath = path.join(process.cwd(), "build", "ssg", "_data");
 
-const renderHtml = (pathname: string, jsBundlePath: string, data?: any) => {
+const renderHtml = (
+  pathname: string,
+  jsBundlePath: string,
+  data?: any,
+  cssBundlePath?: string
+) => {
   const helmetContext: FilledContext | {} = {};
   const markup = ReactDOMServer.renderToString(
     <StaticRouter location={pathname}>
@@ -50,13 +61,19 @@ const renderHtml = (pathname: string, jsBundlePath: string, data?: any) => {
     dataString = `<script id="__MY_DATA__" type="application/json">${escaped}</script>`;
   }
 
+  let css = "";
+  if (cssBundlePath) {
+    css = `<link href="${cssBundlePath}" rel="stylesheet">`;
+  }
+
   return `<!DOCTYPE html>
 <html ${helmet.htmlAttributes.toString()}>
   <head>
     ${helmet.title.toString()}
     ${helmet.meta.toString()}
     ${helmet.link.toString()}
-    <script defer src="/${jsBundlePath}"></script>
+    ${css}
+    <script defer src="${jsBundlePath}"></script>
     <!--insert script here-->
   </head>
   <body ${helmet.bodyAttributes.toString()}>
@@ -75,7 +92,6 @@ const flattenRoutesAndGetStaticData = async (
   node: SSGRoutes,
   basePath?: string
 ): Promise<FlattenRoute[]> => {
-  // 这个location写的太烂了
   let location = "";
   {
     if (basePath === undefined) {
@@ -125,14 +141,19 @@ const flattenRoutesAndGetStaticData = async (
 };
 
 // todo 重构，把json拎出来
+// todo 把渲染和输出也单拎出来
 
 (async () => {
   const routes = await flattenRoutesAndGetStaticData(ssgRoutes);
+  console.log(
+    "routes:",
+    routes.map((r) => r.absolutePath)
+  );
 
   const jsBundlePath = await fs
-    .readdir(path.join(outputPath, "js"))
+    .readdir(path.join(outputPath, "assets"))
     .then((dir) => dir.find((s) => s.match(/main\..*\.bundle.js/)))
-    .then((fileName) => (!!fileName ? `js/${fileName}` : undefined));
+    .then((fileName) => (!!fileName ? `/assets/${fileName}` : undefined));
   if (!jsBundlePath) {
     throw new Error("i cant find client js bundle");
   }
@@ -140,6 +161,9 @@ const flattenRoutesAndGetStaticData = async (
   // fs.mkdir有条件竞争，暂时先不并行
   // const tasks = routes.map(async (route) => {
   for (const route of routes) {
+    // if (route.absolutePath.match(/blog\/.+$/)) {
+    //   continue;
+    // }
     if (route.assetsPath) {
       await fs.cp(
         route.assetsPath,
@@ -147,9 +171,20 @@ const flattenRoutesAndGetStaticData = async (
         { recursive: true }
       );
     } else {
+      // css路径
+      const cssBundlePath = await fs
+        .readdir(path.join(outputPath, "assets"))
+        .then((dir) => dir.find((s) => s.match(/main\..*\.css/)))
+        .then((fileName) => (!!fileName ? `/assets/${fileName}` : undefined));
+
       const data = await route.getStaticData?.({ path: route.absolutePath });
       // 输出html
-      const html = renderHtml(route.absolutePath, jsBundlePath, data);
+      const html = renderHtml(
+        route.absolutePath,
+        jsBundlePath,
+        data,
+        cssBundlePath
+      );
 
       let htmlFilePath = "";
       {
@@ -165,6 +200,7 @@ const flattenRoutesAndGetStaticData = async (
         }
       }
 
+      console.log(htmlFilePath);
       await fs.mkdir(path.dirname(htmlFilePath), {
         recursive: true,
         mode: 0o755,

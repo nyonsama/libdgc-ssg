@@ -11,23 +11,30 @@ import { visit } from "unist-util-visit";
 import { toHtml } from "hast-util-to-html";
 import { toVFile, read } from "to-vfile";
 import rehypeRaw from "rehype-raw";
+import remarkToc from "remark-toc";
+import { u } from "unist-builder";
+import { h } from "hastscript";
+import rehypeHighlight from "rehype-highlight";
+import remarkGfm from "remark-gfm";
+import { toc } from "mdast-util-toc";
 
 const mdDir = path.join(process.cwd(), "posts");
 
 export interface FrontMatter {
   title: string;
   ctime: string;
-  mtime: string;
+  mtime?: string;
+  preview?: string;
   description: string;
   tags: string[];
   category: string;
 }
 
 const isValidFrontMatter = (o: any): o is FrontMatter => {
-  const check: Array<keyof FrontMatter> = [
+  const check: Array<keyof NonNullable<FrontMatter>> = [
     "title",
     "ctime",
-    "mtime",
+    // "mtime",
     "description",
     "tags",
     "category",
@@ -41,7 +48,7 @@ const isValidFrontMatter = (o: any): o is FrontMatter => {
   return true;
 };
 
-interface Toc {
+export interface TocEntry {
   level: 1 | 2 | 3 | 4 | 5 | 6;
   /** @description \<a href="#这个"\> */
   id: string;
@@ -50,7 +57,7 @@ interface Toc {
 
 export interface BlogPostData {
   frontMatter: FrontMatter;
-  toc: Toc[];
+  toc: TocEntry[];
   markup: string;
 }
 
@@ -79,21 +86,85 @@ export class BlogPost {
         matter(file, { strip: true });
         // console.log(file.data.matter);
       })
+      .use(() => (tree, file) => {
+        // 在标题后面插入一个 "## 目录"
+        let tocIndex =
+          tree.children.findIndex(
+            (c) => c.type === "heading" && c.depth === 1
+          ) + 1;
+        tree.children = [
+          ...tree.children.slice(0, tocIndex),
+          u("heading", { depth: 2 as const }, [u("text", { value: "目录" })]),
+          ...tree.children.slice(tocIndex),
+        ];
+        console.log(tree.children);
+      })
+      // .use(remarkToc, { heading: "目录", maxDepth: 3 })
+      .use(() => (node) => {
+        const result = toc(node, { heading: "目录", maxDepth: 3 });
+
+        if (
+          result.endIndex === null ||
+          result.index === null ||
+          result.index === -1 ||
+          !result.map
+        ) {
+          return;
+        }
+
+        node.children = [
+          ...node.children.slice(0, result.index),
+          result.map,
+          ...node.children.slice(result.index),
+        ];
+      })
+      .use(remarkGfm)
       .use(remarkRehype, { allowDangerousHtml: true })
       .use(rehypeRaw)
       .use(rehypeSlug)
+      .use(rehypeHighlight)
       .use(() => (tree, file) => {
-        const toc: Toc[] = [];
+        const toc: TocEntry[] = [];
         visit(tree, "element", (node) => {
-          if (["h1", "h2", "h3", "h4", "h5", "h6"].includes(node.tagName)) {
+          if (
+            ["h2", "h3", "h4", "h5", "h6"].includes(node.tagName) &&
+            node.properties?.id !== "目录"
+          ) {
             toc.push({
               id: node.properties?.id as string,
-              level: parseInt(node.tagName[1]) as Toc["level"],
+              level: parseInt(node.tagName[1]) as TocEntry["level"],
               content: toHtml(node.children),
             });
           }
         });
         file.data.toc = toc;
+      })
+      .use(() => (tree, file) => {
+        // 用<div>把插入的目录包起来
+        const tocHeadingIndex = tree.children.findIndex(
+          (c) => c.type === "element" && c.properties?.id === "目录"
+        );
+        if (tocHeadingIndex === -1) {
+          return;
+        }
+        const tocIndex =
+          tree.children
+            .slice(tocHeadingIndex)
+            .findIndex((c) => c.type === "element" && c.tagName === "ul") +
+          tocHeadingIndex;
+
+        tree.children = [
+          ...tree.children.slice(0, tocHeadingIndex),
+          h(
+            "div.toc-wrap",
+            h(
+              // "div.not-prose.toc",
+              "div.toc",
+              tree.children.slice(tocHeadingIndex, tocIndex + 1) as any[]
+            )
+          ),
+          ...tree.children.slice(tocIndex + 1),
+        ];
       })
       .use(rehypeStringify)
       .process(await read(this.mdFilePath));
@@ -105,9 +176,11 @@ export class BlogPost {
         )}) not valid`
       );
     }
+    // console.log(String(vf));
+    // console.log(vf.data.toc);
     return {
       frontMatter: vf.data.matter,
-      toc: vf.data.toc as Toc[],
+      toc: vf.data.toc as TocEntry[],
       markup: String(vf),
     };
   }
@@ -176,7 +249,7 @@ export class BlogPost {
 interface Post {
   id: string;
   frontMatter: FrontMatter;
-  toc: Toc[];
+  toc: TocEntry[];
   assetsPath?: string;
   markup: string;
 }
@@ -194,12 +267,12 @@ const parseAndRender = async (
     .use(remarkRehype)
     .use(rehypeSlug)
     .use(() => (tree, file) => {
-      const toc: Toc[] = [];
+      const toc: TocEntry[] = [];
       visit(tree, "element", (node) => {
         if (["h1", "h2", "h3", "h4", "h5", "h6"].includes(node.tagName)) {
           toc.push({
             id: node.properties?.id as string,
-            level: parseInt(node.tagName[1]) as Toc["level"],
+            level: parseInt(node.tagName[1]) as TocEntry["level"],
             content: toHtml(node.children),
           });
         }
@@ -216,7 +289,7 @@ const parseAndRender = async (
   }
   return {
     frontMatter: vf.data.matter,
-    toc: vf.data.toc as Toc[],
+    toc: vf.data.toc as TocEntry[],
     markup: String(vf),
   };
 };

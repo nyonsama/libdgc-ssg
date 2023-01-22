@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-bg-primary text-text-primary;
+  }
+}
+
+@layer components {
+  .comp-container {
+    @apply container lg:max-w-screen-lg mx-auto px-4;
+  }
+}
+
+#root{
+  @apply flex flex-col min-h-screen
+}
+
+.post iframe {
+  @apply bg-white;
+}
+
+.toc {
+  @apply lg:hidden;
+}
+
+.toc-active {
+  @apply text-primary;
+}
+
+.post h2,
+.post h3,
+.post h4,
+.post h5,
+.post h6 {
+  @apply scroll-mt-16;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+* {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+/* .post input[type="checkbox" i]:checked {
+  color: blue;
+  background-color: blue;
+} */

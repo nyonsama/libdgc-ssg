@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import * as ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
-import { StaticDataProvider } from "./context/StaticDataContext";
+import { StaticDataProvider } from "./frame/context/StaticDataContext";
 
 let container = document.querySelector("#root");
 if (!container) {

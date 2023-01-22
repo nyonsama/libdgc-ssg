@@ -1,16 +1,14 @@
-import path from "path";
 import { GetStaticData } from "../frame";
-import fs from "fs/promises";
 import { BlogPost, FrontMatter } from "../frame/markdown";
 
-export interface HomeStaticData {
+export interface BlogListStaticData {
   posts: {
     id: string;
     frontMatter: FrontMatter;
   }[];
 }
 
-export const getStaticData: GetStaticData<HomeStaticData> = async (context) => {
+export const getStaticData: GetStaticData<BlogListStaticData> = async () => {
   const posts = await BlogPost.listPosts();
   const data = await Promise.all(
     posts.map(async (p) => ({
@@ -28,5 +26,3 @@ export const getStaticData: GetStaticData<HomeStaticData> = async (context) => {
     posts: data,
   };
 };
-
-// todo 主页

@@ -3,72 +3,9 @@ import webpack from "webpack";
 import path from "path";
 import chokidar from "chokidar";
 import child_process from "child_process";
+import { clientDev, server } from "../webpack.config.js";
 
-const compiler = webpack([
-  {
-    mode: "development",
-    devtool: "eval-source-map",
-    module: {
-      rules: [
-        {
-          test: /\.css$/,
-          use: ["style-loader", "css-loader"],
-        },
-        {
-          test: /\.[jt]sx?$/,
-          exclude: /(node_modules)/,
-          use: {
-            loader: "swc-loader",
-          },
-        },
-      ],
-    },
-    resolve: {
-      extensions: [".ts", ".tsx", "..."],
-    },
-    entry: path.join(process.cwd(), "src", "entry.client.tsx"),
-    target: "browserslist:development",
-    output: {
-      filename: "[name].[contenthash].bundle.js",
-      path: path.join(process.cwd(), "build", "ssg", "js"),
-      clean: true,
-    },
-    plugins: [
-      // new CopyWebpackPlugin({
-      //   patterns: [{ from: "public/*", to: "build/ssg/" }],
-      // }),
-    ],
-  },
-  {
-    mode: "development",
-    devtool: "eval-source-map",
-    module: {
-      rules: [
-        {
-          test: /\.css$/,
-          use: ["style-loader", "css-loader"],
-        },
-        {
-          test: /\.[jt]sx?$/,
-          exclude: /(node_modules)/,
-          use: {
-            loader: "swc-loader",
-          },
-        },
-      ],
-    },
-    resolve: {
-      extensions: [".ts", ".tsx", "..."],
-    },
-    entry: path.join(process.cwd(), "src", "entry.server.tsx"),
-    target: "browserslist:server",
-    output: {
-      filename: "ssg.cjs",
-      path: path.join(process.cwd(), "build"),
-      clean: false,
-    },
-  },
-]);
+const compiler = webpack([clientDev, server]);
 
 const runCompiler = async (compiler: ReturnType<typeof webpack>) => {
   return new Promise((resolve, reject) => {
@@ -112,7 +49,7 @@ chokidar.watch(["src", "posts", "public"]).on("all", (event, path) => {
     return;
   }
   taskIsRunning = true;
-  console.log()
+  console.log();
   console.log("Running task------------");
   runCompiler(compiler)
     .then(runSSGScript)
@@ -123,14 +60,13 @@ chokidar.watch(["src", "posts", "public"]).on("all", (event, path) => {
 
 const app = express();
 
+app.use((req, res, next) => {
+  // todo 渲染这个path,输出到文件系统
+  next();
+});
+
 const staticRoot = path.join(process.cwd(), "build", "ssg");
-app.use(
-  express.static(staticRoot, {
-    extensions: ["html"],
-    fallthrough: true,
-    redirect: true,
-  })
-);
+app.use(express.static(staticRoot, { extensions: ["html"] }));
 
 // todo 404页面
 

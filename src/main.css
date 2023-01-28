@@ -3,19 +3,25 @@
 @tailwind utilities;
 
 @layer base {
-  html {
-    @apply bg-bg-primary text-text-primary;
+  a {
+    @apply hover:text-primary;
   }
 }
 
 @layer components {
-  .comp-container {
+  .page-container {
     @apply container lg:max-w-screen-lg mx-auto px-4;
   }
 }
 
-#root{
-  @apply flex flex-col min-h-screen
+:root {
+  @apply bg-bg-primary text-text-primary;
+  --navbar-height: 64px;
+  --footer-height: 64px;
+}
+
+#root {
+  @apply flex flex-col min-h-screen;
 }
 
 .post iframe {
@@ -38,16 +44,15 @@
   @apply scroll-mt-16;
 }
 
-a:hover {
-  text-decoration: underline;
-}
-
 * {
   color-scheme: dark;
   scroll-behavior: smooth;
 }
 
-/* .post input[type="checkbox" i]:checked {
-  color: blue;
-  background-color: blue;
-} */
+/* 
+ * 遇到了tailwindcss的bug
+ * prose-a:hover:underline 这个类生成的选择器有问题
+ */
+.post a:hover:not(a[class~="not-prose"]) {
+  text-decoration-line: underline;
+}

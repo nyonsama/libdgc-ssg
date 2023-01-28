@@ -1,35 +1,55 @@
 import React, { useEffect, useState } from "react";
 import * as ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import App from "./App";
-import { StaticDataProvider } from "./frame/context/StaticDataContext";
+import { HelmetProvider } from "react-helmet-async";
+import {
+  BrowserRouter,
+  createBrowserRouter,
+  LoaderFunction,
+  RouteObject,
+  RouterProvider,
+} from "react-router-dom";
+import { staticDataLoader } from "./frame";
+import Home from "./routes";
+import About from "./routes/about";
+import Blog from "./routes/blog";
+import BlogList from "./routes/bloglist";
+import BlogRoll from "./routes/blogroll";
+import "highlight.js/styles/github-dark.css";
+import "./main.css";
+
+const routes: RouteObject[] = [
+  {
+    path: "/",
+    element: <Home />,
+    loader: staticDataLoader,
+  },
+  {
+    path: "/blog/",
+    element: <BlogList />,
+    loader: staticDataLoader,
+  },
+  { path: "/blogroll", element: <BlogRoll /> },
+  { path: "/about", element: <About /> },
+  {
+    path: "/blog/:blogId",
+    element: <Blog />,
+    loader: staticDataLoader,
+  },
+];
+
+const router = createBrowserRouter(routes);
+
+const elements = (
+  <HelmetProvider>
+    <RouterProvider router={router} />
+  </HelmetProvider>
+);
+
+console.log(process.env.NODE_ENV);
 
 let container = document.querySelector("#root");
 if (!container) {
   container = document.createElement("div");
   document.querySelector("body")?.appendChild(container);
 }
-
-const staticData = (() => {
-  const dataElement = document.querySelector("#__MY_DATA__");
-  if (dataElement?.textContent) {
-    return JSON.parse(dataElement.textContent);
-  }
-})();
-
-const elements = (
-  <BrowserRouter>
-    <StaticDataProvider initialData={staticData}>
-      <App />
-    </StaticDataProvider>
-  </BrowserRouter>
-);
-
-console.log(process.env.NODE_ENV);
-
-if (process.env.NODE_ENV === "production") {
-  ReactDOM.hydrateRoot(container, elements);
-} else {
-  const root = ReactDOM.createRoot(container);
-  root.render(elements);
-}
+ReactDOM.hydrateRoot(container, elements);

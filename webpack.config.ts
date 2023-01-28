@@ -40,6 +40,10 @@ export const clientDev: webpack.Configuration = {
       {
         test: /\.(png|jpg|jpeg|gif|webp)$/,
         type: "asset/resource",
+        generator: {
+          // import asdf from "asdf.png" 在客户端的结果和服务端不一样，客户端是asdf完整的url,服务端只有文件名，所以客户端要去掉url前面的域名，只剩下pathname
+          publicPath: "/assets/",
+        },
       },
       // {
       //   test: /\.svg$/i,
@@ -103,7 +107,7 @@ export const server: webpack.Configuration = {
         type: "asset/resource",
         generator: {
           emit: false,
-          // import asdf from "asdf.png" 在客户端的结果和服务端不一样，客户端是asdf完整的url,服务端只有文件名，所以要手动加上这个publicPath
+          // import asdf from "asdf.png" 在客户端的结果和服务端不一样，客户端是asdf完整的url,服务端只有文件名，所以服务端要手动加上/assets/前缀
           publicPath: "/assets/",
         },
       },

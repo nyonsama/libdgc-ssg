@@ -5,7 +5,7 @@ const NavBar: React.FC = () => {
   return (
     <>
       <div className="sticky inset-x-0 top-0 h-16 z-20 bg-black/75">
-        <nav className="comp-container flex items-center h-full">
+        <nav className="page-container flex items-center h-full">
           <div className="flex flex-1">
             {/* <div className="mr-4">icon</div> */}
             <a href="/">libdgc.club</a>

@@ -4,7 +4,7 @@ ctime: "2023-01-20T06:35:27.956Z"
 # mtime: "2023-01-15T09:02:51.147Z"
 description: "包括CommonMark、GFM、代码高亮、iframe 等"
 category: "杂项"
-tags: ["markdown", "测试"]
+tags: ["markdown", "测试", "站务"]
 ---
 
 # 测试 Markdown 渲染效果
@@ -83,7 +83,7 @@ Rust 破除了这些障碍：它消除了旧的陷阱，并提供了伴你一路
 
 ### 自动链接
 
-自动链接（如 http://www.commonmark.org）
+自动链接（如 http://www.commonmark.org ）
 
 ### 任务列表
 

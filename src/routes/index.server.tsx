@@ -1,6 +1,3 @@
-import path from "path";
-import { GetStaticData } from "../frame";
-import fs from "fs/promises";
 import { BlogPost, FrontMatter } from "../frame/markdown";
 
 export interface HomeStaticData {
@@ -10,7 +7,11 @@ export interface HomeStaticData {
   }[];
 }
 
-export const getStaticData: GetStaticData<HomeStaticData> = async (context) => {
+// 对于既需要静态生成数据又需要访问外部api的页面
+// 不用loader请求外部api，直接用useEffect或者useSWR
+// 或者不静态生成数据，弄个静态API，在客户端用loader请求两个api
+
+export const getStaticData = async (): Promise<HomeStaticData> => {
   const posts = await BlogPost.listPosts();
   const data = await Promise.all(
     posts.map(async (p) => ({

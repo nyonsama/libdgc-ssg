@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { BsBookmark, BsCalendar4, BsTag } from "react-icons/bs";
+import { useLoaderData } from "react-router-dom";
 import Footer from "../components/Footer";
 import InlineIcon from "../components/InlineIcon";
 import NavBar from "../components/NavBar";
-import { useStaticData } from "../frame/context/StaticDataContext";
 import { BlogPostData, TocEntry } from "../frame/markdown";
+import classNames from "classnames";
 
 const Toc = (props: { toc: TocEntry[]; activeId?: string }) => {
   return (
-    <div className="relative max-h-[calc(100vh-6rem-4rem)] min-w-[8rem] overflow-auto">
+    <div className="relative max-h-[calc(100vh-var(--navbar-height)-2rem-var(--footer-height))] min-w-[8rem] overflow-auto">
       <h2 className="mb-2 text-lg text-text-600 font-medium">目录</h2>
       <hr className="border-t border-solid border-text-800" />
       <ul>
@@ -34,15 +35,11 @@ const Toc = (props: { toc: TocEntry[]; activeId?: string }) => {
   );
 };
 
-// todo: 不解释
 const Blog = () => {
   const [activeTocId, setActiveTocId] = useState<string>("");
-  const { data, isLoading, error } = useStaticData<BlogPostData>();
+  const data = useLoaderData() as BlogPostData;
 
   useEffect(() => {
-    if (!data) {
-      return;
-    }
     // 检测显示在视口中的元素，设置activeTocId
     const postBody = document.querySelector(".post")!;
     const elements = Array.from(
@@ -64,6 +61,10 @@ const Blog = () => {
       elements.map((e) => [e, false])
     );
 
+    const navbarHeight = getComputedStyle(document.querySelector(":root")!)
+      .getPropertyValue("--navbar-height")
+      .trim();
+
     const observer = new IntersectionObserver(
       (entries, observer) => {
         for (const entry of entries) {
@@ -80,7 +81,7 @@ const Blog = () => {
           setActiveTocId("");
         }
       },
-      { threshold: [0.0, 1.0], rootMargin: "-64px 0px 0px 0px" }
+      { threshold: [0.0, 1.0], rootMargin: `-${navbarHeight} 0px 0px 0px` }
     );
 
     for (const h of elements) {
@@ -92,14 +93,13 @@ const Blog = () => {
     };
   }, [data, setActiveTocId]);
 
-  let content;
-  if (isLoading) {
-    // content = "loading";
-  } else if (data) {
-    const timeString = new Date(data.frontMatter.ctime).toLocaleString("zh-CN");
-    const category = data.frontMatter.category;
-    content = (
-      <>
+  const timeString = new Date(data.frontMatter.ctime).toLocaleString("zh-CN");
+  const category = data.frontMatter.category;
+
+  return (
+    <>
+      <NavBar />
+      <div className="page-container mt-4 mb-16 flex-1">
         <div className="w-full aspect-[16/9] max-w-2xl bg-text-secondary mb-4"></div>
         <div className="text-text-secondary mb-2 space-x-4">
           <span>
@@ -127,7 +127,12 @@ const Blog = () => {
         </div>
         <div className="relative">
           <div
-            className="prose prose-invert prose-headings:text-text-200 prose-a:text-primary prose-a:no-underline text-text-primary prose-blockquote:text-text-primary max-w-2xl post"
+            className={classNames(
+              "prose prose-invert",
+              "prose-headings:text-text-200 prose-a:text-primary prose-a:no-underline text-text-primary prose-blockquote:text-text-primary",
+              "max-w-2xl",
+              "post"
+            )}
             dangerouslySetInnerHTML={{ __html: data.markup }}
           ></div>
           <div className="absolute inset-y-0 right-0 max-lg:hidden">
@@ -136,16 +141,8 @@ const Blog = () => {
             </div>
           </div>
         </div>
-      </>
-    );
-  } else {
-    content = <>{`error:${error}`}</>;
-  }
-  return (
-    <>
-      <NavBar />
-      <div className="comp-container mt-4 mb-16 flex-1">{content}</div>
-      {isLoading ? <></> : <Footer />}
+      </div>
+      <Footer />
     </>
   );
 };

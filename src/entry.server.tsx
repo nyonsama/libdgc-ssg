@@ -1,155 +1,137 @@
-import React from "react";
 import * as ReactDOMServer from "react-dom/server";
-import { FilledContext } from "react-helmet-async";
-import { StaticRouter } from "react-router-dom/server";
-import App from "./App";
+import { FilledContext, HelmetProvider } from "react-helmet-async";
 import {
-  StaticData,
-  StaticDataProvider,
-} from "./frame/context/StaticDataContext";
-import { GetStaticData, SSGRoutes } from "./frame";
+  createStaticRouter,
+  StaticRouterProvider,
+} from "react-router-dom/server";
+import { PathTree } from "./frame";
 import fs from "fs/promises";
 import path from "path";
-import { getStaticPaths as blogPaths } from "./routes/blog.server";
+import { blogLoader, getStaticPaths as blogPaths } from "./routes/blog.server";
 import { getStaticData as indexStaticData } from "./routes/index.server";
 import { getStaticData as blogListStaticData } from "./routes/bloglist.server";
+import { RouteObject } from "react-router-dom";
+import Home from "./routes";
+import About from "./routes/about";
+import Blog from "./routes/blog";
+import BlogList from "./routes/bloglist";
+import BlogRoll from "./routes/blogroll";
+import GlobalHeads from "./components/GlobalHeads";
+import { createStaticHandler } from "@remix-run/router";
 
-// filesystem router is too complex so i code my routes by hand
-const ssgRoutes: SSGRoutes = {
-  path: "/",
+const outputPath = path.join(process.cwd(), "build", "ssg");
+const dataPath = path.join(process.cwd(), "build", "ssg", "_data");
+
+const staticPaths: PathTree = {
+  name: "",
   type: "page",
-  getStaticData: indexStaticData,
   children: [
-    { path: "blogroll", type: "page" },
-    { path: "about", type: "page" },
+    { name: "blogroll", type: "page" },
+    { name: "about", type: "page" },
     {
-      path: "blog/",
+      name: "blog",
       type: "page",
-      getStaticData: blogListStaticData,
       children: blogPaths,
     },
   ],
 };
 
-const outputPath = path.join(process.cwd(), "build", "ssg");
-const dataPath = path.join(process.cwd(), "build", "ssg", "_data");
+const routes: RouteObject[] = [
+  {
+    path: "/",
+    element: <Home />,
+    loader: () => indexStaticData(),
+  },
+  {
+    path: "/blog/",
+    element: <BlogList />,
+    loader: () => blogListStaticData(),
+  },
+  { path: "/blogroll", element: <BlogRoll /> },
+  { path: "/about", element: <About /> },
+  {
+    path: "/blog/:postId",
+    element: <Blog />,
+    loader: blogLoader,
+  },
+];
 
-const renderHtml = (
+// 不实现url params，因为没办法导出成单独的html文件
+
+const visitPaths = async (
+  node: PathTree,
+  visitor: (pathname: string, node: PathTree) => Promise<void>,
+  base = ""
+): Promise<void> => {
+  base = base.replace(/\/$/, "");
+  let currentBase = base + "/" + node.name;
+  if (node.children && !currentBase.endsWith("/")) {
+    currentBase += "/";
+  }
+  await visitor(currentBase, node);
+  if (node.children) {
+    const children =
+      node.children instanceof Array ? node.children : await node.children();
+    for (const next of children) {
+      await visitPaths(next, visitor, currentBase);
+    }
+  }
+};
+
+const pathnameToFsPath = (pathname: string) => {
+  return path.join(outputPath, ...pathname.split("/"));
+};
+
+const render = async (
   pathname: string,
-  jsBundlePath: string,
-  data?: any,
-  cssBundlePath?: string
+  routes: RouteObject[],
+  resourcePath: { js?: string; css?: string }
 ) => {
+  // some boilerplate code that copied from react-router ssr-data-router example
+  let { query } = createStaticHandler(routes);
+  const context = await query(new Request(`http://dummy${pathname}`));
+  if (context instanceof Response) {
+    throw context;
+  }
+  const router = createStaticRouter(routes, context);
+
+  // context.loaderData的类型是interface RouteData { [routeId: string]: any; }，不知道routeId是多少，不过在ssr时似乎只有一个键值对
+  const staticData = JSON.stringify(Object.values(context.loaderData)[0]) as
+    | string
+    | undefined;
+
+  const { js, css } = resourcePath;
   const helmetContext: FilledContext | {} = {};
   const markup = ReactDOMServer.renderToString(
-    <StaticRouter location={pathname}>
-      <StaticDataProvider initialData={{ path: pathname, data: data }} ssr>
-        <App helmetContext={helmetContext} />
-      </StaticDataProvider>
-    </StaticRouter>
+    <HelmetProvider context={helmetContext}>
+      <GlobalHeads />
+      <StaticRouterProvider router={router} context={context} />
+    </HelmetProvider>
   );
   const { helmet } = helmetContext as FilledContext;
 
-  let dataString = "";
-  if (data) {
-    const staticData: StaticData = {
-      path: pathname,
-      data: data,
-    };
-    const json = JSON.stringify(staticData);
-    const escaped = json.replaceAll("<", "\\u003c").replaceAll(">", "\\u003e");
-    dataString = `<script id="__MY_DATA__" type="application/json">${escaped}</script>`;
-  }
+  const cssMarkup = css ? `<link href="${css}" rel="stylesheet">` : "";
+  const jsMarkup = js ? `<script defer src="${js}"></script>` : ""; // 先不做代码分割
 
-  let css = "";
-  if (cssBundlePath) {
-    css = `<link href="${cssBundlePath}" rel="stylesheet">`;
-  }
-
-  return `<!DOCTYPE html>
+  return {
+    staticData,
+    html: `<!DOCTYPE html>
 <html ${helmet.htmlAttributes.toString()}>
   <head>
     ${helmet.title.toString()}
     ${helmet.meta.toString()}
+    ${cssMarkup}
+    ${jsMarkup}
     ${helmet.link.toString()}
-    ${css}
-    <script defer src="${jsBundlePath}"></script>
-    <!--insert script here-->
   </head>
   <body ${helmet.bodyAttributes.toString()}>
-    <div id="root">${markup}</div>${dataString}
+    <div id="root">${markup}</div>
   </body>
-</html>`;
+</html>`,
+  };
 };
-
-interface FlattenRoute {
-  absolutePath: string;
-  getStaticData?: GetStaticData<any>;
-  assetsPath?: string;
-}
-
-const flattenRoutesAndGetStaticData = async (
-  node: SSGRoutes,
-  basePath?: string
-): Promise<FlattenRoute[]> => {
-  let location = "";
-  {
-    if (basePath === undefined) {
-      location = node.path;
-    } else if (basePath.endsWith("/")) {
-      location = basePath + node.path;
-    } else {
-      location = basePath + "/" + node.path;
-    }
-  }
-
-  if (node.type === "asset") {
-    return [
-      {
-        absolutePath: location,
-        assetsPath: node.dirPath,
-      },
-    ];
-  } else {
-    // const data = await node.getStaticData?.({ path: location });
-
-    const routes = [];
-
-    if (node.type === "page") {
-      const currentRoute: FlattenRoute = {
-        absolutePath: location,
-        getStaticData: node.getStaticData,
-      };
-      routes.push(currentRoute);
-    }
-
-    let children: SSGRoutes[] | undefined = undefined;
-    if (node.children instanceof Array) {
-      children = node.children;
-    } else if (node.children instanceof Function) {
-      children = await node.children();
-    }
-
-    if (children !== undefined) {
-      for (const route of children) {
-        routes.push(...(await flattenRoutesAndGetStaticData(route, location)));
-      }
-    }
-
-    return routes;
-  }
-};
-
-// todo 重构，把json拎出来
-// todo 把渲染和输出也单拎出来
 
 (async () => {
-  const routes = await flattenRoutesAndGetStaticData(ssgRoutes);
-  console.log(
-    "routes:",
-    routes.map((r) => r.absolutePath)
-  );
-
   const jsBundlePath = await fs
     .readdir(path.join(outputPath, "assets"))
     .then((dir) => dir.find((s) => s.match(/main\..*\.bundle.js/)))
@@ -158,75 +140,46 @@ const flattenRoutesAndGetStaticData = async (
     throw new Error("i cant find client js bundle");
   }
 
-  // fs.mkdir有条件竞争，暂时先不并行
-  // const tasks = routes.map(async (route) => {
-  for (const route of routes) {
-    // if (route.absolutePath.match(/blog\/.+$/)) {
-    //   continue;
-    // }
-    if (route.assetsPath) {
-      await fs.cp(
-        route.assetsPath,
-        path.join(outputPath, ...route.absolutePath.split("/")),
-        { recursive: true }
-      );
-    } else {
-      // css路径
-      const cssBundlePath = await fs
-        .readdir(path.join(outputPath, "assets"))
-        .then((dir) => dir.find((s) => s.match(/main\..*\.css/)))
-        .then((fileName) => (!!fileName ? `/assets/${fileName}` : undefined));
+  const cssBundlePath = await fs
+    .readdir(path.join(outputPath, "assets"))
+    .then((dir) => dir.find((s) => s.match(/main\..*\.css/)))
+    .then((fileName) => (!!fileName ? `/assets/${fileName}` : undefined));
 
-      const data = await route.getStaticData?.({ path: route.absolutePath });
-      // 输出html
-      const html = renderHtml(
-        route.absolutePath,
-        jsBundlePath,
-        data,
-        cssBundlePath
-      );
-
-      let htmlFilePath = "";
-      {
-        if (route.absolutePath.endsWith("/")) {
-          htmlFilePath = path.join(
-            outputPath,
-            ...route.absolutePath.split("/"),
-            "index.html"
-          );
-        } else {
-          htmlFilePath =
-            path.join(outputPath, ...route.absolutePath.split("/")) + ".html";
-        }
+  await visitPaths(staticPaths, async (pathname, node) => {
+    console.log(pathname);
+    const destPath = pathnameToFsPath(pathname);
+    if (node.type === "asset") {
+      if (pathname.endsWith("/")) {
+        await fs.mkdir(destPath, { recursive: true, mode: 0o755 });
+      } else {
+        await fs.copyFile(node.filePath, destPath);
       }
-
-      console.log(htmlFilePath);
-      await fs.mkdir(path.dirname(htmlFilePath), {
-        recursive: true,
-        mode: 0o755,
+    } else if (node.type === "page") {
+      if (pathname.endsWith("/")) {
+        await fs.mkdir(destPath, { recursive: true, mode: 0o755 });
+      }
+      const { html, staticData } = await render(pathname, routes, {
+        js: jsBundlePath,
+        css: cssBundlePath,
       });
+      const htmlFilePath = pathname.endsWith("/")
+        ? path.join(destPath, "index.html")
+        : destPath + ".html";
       await fs.writeFile(htmlFilePath, html);
 
-      // 输出json
-      if (data) {
-        let jsonFilePath = "";
-        {
-          if (route.absolutePath === "/") {
-            jsonFilePath = path.join(dataPath, "index.json");
-          } else {
-            jsonFilePath =
-              path.join(dataPath, ...route.absolutePath.split("/")) + ".json";
-          }
-        }
-
-        await fs.mkdir(path.dirname(jsonFilePath), {
-          recursive: true,
-          mode: 0o755,
-        });
-        await fs.writeFile(jsonFilePath, JSON.stringify(data));
+      // write json
+      const jsonPath =
+        pathname === "/"
+          ? path.join(dataPath, "index.json")
+          : path.join(dataPath, ...pathname.split("/")) + ".json";
+      await fs.mkdir(path.dirname(jsonPath), { recursive: true });
+      if (staticData) {
+        await fs.writeFile(jsonPath, staticData);
       }
+    } else {
+      // do nothing
     }
-  }
+  });
 
   const publicFileDir = path.join(process.cwd(), "public");
   await Promise.all(
@@ -238,40 +191,4 @@ const flattenRoutesAndGetStaticData = async (
       })
     )
   );
-
-  // await Promise.all(tasks);
-
-  // 搬运assets
-  // 示例：posts/{postname}/assets -> build/ssg/blog/{postname}/assets
-  // 目前这里写死了搬运markdown的私有assets,如果以后有其他类似用例就不写死
-  // const mdFileDir = path.join(process.cwd(), "posts");
-  // const postNames: string[] = [];
-  // {
-  //   const dir = await fs.opendir(mdFileDir);
-  //   for await (const dirent of dir) {
-  //     if (dirent.isDirectory()) {
-  //       postNames.push(dirent.name);
-  //     }
-  //   }
-  // }
-  // for (const post of postNames) {
-  //   const src = path.join(
-  //     mdFileDir,
-  //     post
-  //     // "assets"
-  //   );
-  //   const dest = path.join(
-  //     process.cwd(),
-  //     "build",
-  //     "ssg",
-  //     "blog",
-  //     post
-  //     // "assets"
-  //   );
-  //   await fs.cp(src, dest, { recursive: true });
-  // }
 })();
-
-// flattenRoutesAndGetStaticData("/")
-
-// todo: settings.js,用来控制一些常量，比如json文件的路径的前缀

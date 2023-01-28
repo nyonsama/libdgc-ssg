@@ -64,13 +64,13 @@ export interface BlogPostData {
 export class BlogPost {
   id: string;
   mdFilePath: string;
-  assetsPath?: string;
+  assetPaths?: string[];
   private data?: BlogPostData;
 
-  private constructor(id: string, mdFilePath: string, assetsPath?: string) {
+  private constructor(id: string, mdFilePath: string, assetsPath?: string[]) {
     this.id = id;
     this.mdFilePath = mdFilePath;
-    this.assetsPath = assetsPath;
+    this.assetPaths = assetsPath;
   }
 
   private async parseAndRender(): Promise<BlogPostData> {
@@ -97,7 +97,7 @@ export class BlogPost {
           u("heading", { depth: 2 as const }, [u("text", { value: "目录" })]),
           ...tree.children.slice(tocIndex),
         ];
-        console.log(tree.children);
+        // console.log(tree.children);
       })
       // .use(remarkToc, { heading: "目录", maxDepth: 3 })
       .use(() => (node) => {
@@ -206,8 +206,12 @@ export class BlogPost {
       } else if (dirent.isDirectory()) {
         const id = dirent.name;
         const filePath = path.join(mdDir, dirent.name, "index.md");
-        const assetsPath = path.join(mdDir, dirent.name);
-        posts.push(new BlogPost(id, filePath, assetsPath));
+        const assetPaths = (await fs.readdir(path.join(mdDir, dirent.name)))
+          .filter((n) => n !== "index.md")
+          .map((f) => path.join(mdDir, id, f));
+        posts.push(new BlogPost(id, filePath, assetPaths));
+      } else {
+        throw `${path.join(mdDir, dirent.name)} is strange`;
       }
     }
     return posts;
@@ -246,130 +250,130 @@ export class BlogPost {
   // }
 }
 
-interface Post {
-  id: string;
-  frontMatter: FrontMatter;
-  toc: TocEntry[];
-  assetsPath?: string;
-  markup: string;
-}
+// interface Post {
+//   id: string;
+//   frontMatter: FrontMatter;
+//   toc: TocEntry[];
+//   assetPaths?: string;
+//   markup: string;
+// }
 
-const parseAndRender = async (
-  filePath: string
-): Promise<Pick<Post, "frontMatter" | "toc" | "markup">> => {
-  const vf = await unified()
-    .use(remarkParse)
-    .use(remarkFrontmatter)
-    .use(() => (tree, file) => {
-      matter(file, { strip: true });
-      // console.log(file.data.matter);
-    })
-    .use(remarkRehype)
-    .use(rehypeSlug)
-    .use(() => (tree, file) => {
-      const toc: TocEntry[] = [];
-      visit(tree, "element", (node) => {
-        if (["h1", "h2", "h3", "h4", "h5", "h6"].includes(node.tagName)) {
-          toc.push({
-            id: node.properties?.id as string,
-            level: parseInt(node.tagName[1]) as TocEntry["level"],
-            content: toHtml(node.children),
-          });
-        }
-      });
-      file.data.toc = toc;
-    })
-    .use(rehypeStringify)
-    .process(await read(filePath));
+// const parseAndRender = async (
+//   filePath: string
+// ): Promise<Pick<Post, "frontMatter" | "toc" | "markup">> => {
+//   const vf = await unified()
+//     .use(remarkParse)
+//     .use(remarkFrontmatter)
+//     .use(() => (tree, file) => {
+//       matter(file, { strip: true });
+//       // console.log(file.data.matter);
+//     })
+//     .use(remarkRehype)
+//     .use(rehypeSlug)
+//     .use(() => (tree, file) => {
+//       const toc: TocEntry[] = [];
+//       visit(tree, "element", (node) => {
+//         if (["h1", "h2", "h3", "h4", "h5", "h6"].includes(node.tagName)) {
+//           toc.push({
+//             id: node.properties?.id as string,
+//             level: parseInt(node.tagName[1]) as TocEntry["level"],
+//             content: toHtml(node.children),
+//           });
+//         }
+//       });
+//       file.data.toc = toc;
+//     })
+//     .use(rehypeStringify)
+//     .process(await read(filePath));
 
-  if (!isValidFrontMatter(vf.data.matter)) {
-    throw new Error(
-      `${filePath} front matter(${JSON.stringify(vf.data.matter)}) not valid`
-    );
-  }
-  return {
-    frontMatter: vf.data.matter,
-    toc: vf.data.toc as TocEntry[],
-    markup: String(vf),
-  };
-};
+//   if (!isValidFrontMatter(vf.data.matter)) {
+//     throw new Error(
+//       `${filePath} front matter(${JSON.stringify(vf.data.matter)}) not valid`
+//     );
+//   }
+//   return {
+//     frontMatter: vf.data.matter,
+//     toc: vf.data.toc as TocEntry[],
+//     markup: String(vf),
+//   };
+// };
 
-const listPostId = async () => {
-  const list: string[] = [];
-  const dir = await fs.opendir(mdDir);
-  for await (const dirent of dir) {
-    if (dirent.isFile() && dirent.name.match(/\.md$/)) {
-      list.push(dirent.name.replace(/\.md$/, ""));
-    } else if (dirent.isDirectory()) {
-      list.push(dirent.name);
-    }
-  }
-  return list;
-};
+// const listPostId = async () => {
+//   const list: string[] = [];
+//   const dir = await fs.opendir(mdDir);
+//   for await (const dirent of dir) {
+//     if (dirent.isFile() && dirent.name.match(/\.md$/)) {
+//       list.push(dirent.name.replace(/\.md$/, ""));
+//     } else if (dirent.isDirectory()) {
+//       list.push(dirent.name);
+//     }
+//   }
+//   return list;
+// };
 
-const getPostById = async (id: string): Promise<Post> => {
-  try {
-    const filePath = path.join(mdDir, `${id}.md`);
-    await fs.access(filePath);
-    return {
-      id,
-      ...(await parseAndRender(filePath)),
-    };
-  } catch {}
+// const getPostById = async (id: string): Promise<Post> => {
+//   try {
+//     const filePath = path.join(mdDir, `${id}.md`);
+//     await fs.access(filePath);
+//     return {
+//       id,
+//       ...(await parseAndRender(filePath)),
+//     };
+//   } catch {}
 
-  try {
-    const filePath = path.join(mdDir, id, "index.md");
-    const assetsPath = path.join(mdDir, id);
-    await fs.access(filePath);
-    return {
-      id,
-      assetsPath,
-      ...(await parseAndRender(filePath)),
-    };
-  } catch {}
+//   try {
+//     const filePath = path.join(mdDir, id, "index.md");
+//     const assetsPath = path.join(mdDir, id);
+//     await fs.access(filePath);
+//     return {
+//       id,
+//       assetPaths: assetsPath,
+//       ...(await parseAndRender(filePath)),
+//     };
+//   } catch {}
 
-  throw new Error(`cant find post with post id ${id}`);
-};
+//   throw new Error(`cant find post with post id ${id}`);
+// };
 
-const getPosts = async () => {
-  const mdList: Array<
-    Pick<Post, "id" | "assetsPath"> & { mdFilePath: string }
-  > = [];
-  {
-    const dir = await fs.opendir(mdDir);
-    for await (const dirent of dir) {
-      if (dirent.isFile() && dirent.name.match(/\.md$/)) {
-        mdList.push({
-          id: dirent.name.replace(/\.md$/, ""),
-          mdFilePath: path.join(mdDir, dirent.name),
-        });
-      } else if (dirent.isDirectory()) {
-        mdList.push({
-          id: dirent.name,
-          assetsPath: path.join(mdDir, dirent.name),
-          mdFilePath: path.join(mdDir, dirent.name, "index.md"),
-        });
-      }
-    }
-  }
+// const getPosts = async () => {
+//   const mdList: Array<
+//     Pick<Post, "id" | "assetPaths"> & { mdFilePath: string }
+//   > = [];
+//   {
+//     const dir = await fs.opendir(mdDir);
+//     for await (const dirent of dir) {
+//       if (dirent.isFile() && dirent.name.match(/\.md$/)) {
+//         mdList.push({
+//           id: dirent.name.replace(/\.md$/, ""),
+//           mdFilePath: path.join(mdDir, dirent.name),
+//         });
+//       } else if (dirent.isDirectory()) {
+//         mdList.push({
+//           id: dirent.name,
+//           assetPaths: path.join(mdDir, dirent.name),
+//           mdFilePath: path.join(mdDir, dirent.name, "index.md"),
+//         });
+//       }
+//     }
+//   }
 
-  const posts = new Map<string, Post>(
-    await Promise.all(
-      mdList.map(async (md) => {
-        return [
-          md.id,
-          {
-            id: md.id,
-            assetsPath: md.assetsPath,
-            ...(await parseAndRender(md.mdFilePath)),
-          },
-        ] as [string, Post];
-      })
-    )
-  );
+//   const posts = new Map<string, Post>(
+//     await Promise.all(
+//       mdList.map(async (md) => {
+//         return [
+//           md.id,
+//           {
+//             id: md.id,
+//             assetPaths: md.assetPaths,
+//             ...(await parseAndRender(md.mdFilePath)),
+//           },
+//         ] as [string, Post];
+//       })
+//     )
+//   );
 
-  return posts;
-};
+//   return posts;
+// };
 
 // toc、frontmatter、markup
 // toc用react渲染

@@ -1,4 +1,3 @@
-import { GetStaticData } from "../frame";
 import { BlogPost, FrontMatter } from "../frame/markdown";
 
 export interface BlogListStaticData {
@@ -8,7 +7,7 @@ export interface BlogListStaticData {
   }[];
 }
 
-export const getStaticData: GetStaticData<BlogListStaticData> = async () => {
+export const getStaticData = async (): Promise<BlogListStaticData> => {
   const posts = await BlogPost.listPosts();
   const data = await Promise.all(
     posts.map(async (p) => ({

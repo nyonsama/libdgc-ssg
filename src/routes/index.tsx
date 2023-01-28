@@ -1,45 +1,12 @@
-import React, { FC } from "react";
-import { Link } from "react-router-dom";
-import { useStaticData } from "../frame/context/StaticDataContext";
+import React from "react";
+import { Link, useLoaderData } from "react-router-dom";
 import { HomeStaticData } from "./index.server";
-import homeBg from "../assets/home.png"; // 这张图不完美
 import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
 import { MdArrowForward } from "react-icons/md";
 import ArticleCard from "../components/ArticleCard";
 import { BsGithub } from "react-icons/bs";
 import avatar from "../assets/avatar.jpg";
-
-interface PostListProps {
-  data: HomeStaticData;
-}
-const PostList: React.FC<PostListProps> = (props: PostListProps) => {
-  const data = props.data;
-  return (
-    <>
-      {data.posts.map((p) => (
-        <div key={p.id}>
-          <Link
-            to={`./blog/${p.id}/`}
-            style={{
-              textDecoration: "underline",
-            }}
-          >
-            {p.frontMatter.title}
-          </Link>
-          <div>{p.frontMatter.description}</div>
-        </div>
-      ))}
-    </>
-  );
-};
-
-/*
-.theme {
-  color: #4483cc;
-  background-color: #001519;
-}
-*/
 
 const FancyThing: React.FC = () => {
   return (
@@ -90,43 +57,11 @@ const AboutMe: React.FC = () => {
 // todo 搜索，放进一个modal里
 
 const Home = () => {
-  const { data, isLoading, error } = useStaticData<HomeStaticData>();
-  let cards = <></>;
-  if (isLoading) {
-    cards = <p>loading</p>;
-  } else if (error) {
-    cards = <p>error</p>;
-  } else if (data) {
-    cards = (
-      <>
-        {data.posts
-          .sort(
-            (a, b) =>
-              Date.parse(b.frontMatter.ctime) - Date.parse(a.frontMatter.ctime)
-          )
-          .slice(0, 6)
-          .map(({ id, frontMatter: matter }) => {
-            return (
-              <ArticleCard
-                key={id}
-                // todo 不写死link
-                link={`/blog/${id}/`}
-                preview={matter.preview}
-                title={matter.title}
-                description={matter.description}
-                category={matter.category}
-                date={new Date(matter.ctime).toLocaleDateString("zh-CN")}
-                tags={matter.tags}
-              />
-            );
-          })}
-      </>
-    );
-  }
+  const data = useLoaderData() as HomeStaticData;
   return (
     <div>
       <NavBar />
-      <div className="comp-container mt-4">
+      <div className="page-container mt-4">
         <Header />
 
         {/* 近期文章 */}
@@ -146,7 +81,28 @@ const Home = () => {
         </header>
         {/* 文章列表 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max mb-16">
-          {cards}
+          {data.posts
+            // .sort(
+            //   (a, b) =>
+            //     Date.parse(b.frontMatter.ctime) -
+            //     Date.parse(a.frontMatter.ctime)
+            // )
+            .slice(0, 6)
+            .map(({ id, frontMatter: matter }) => {
+              return (
+                <ArticleCard
+                  key={id}
+                  // todo 不写死link
+                  link={`/blog/${id}`}
+                  preview={matter.preview}
+                  title={matter.title}
+                  description={matter.description}
+                  category={matter.category}
+                  date={new Date(matter.ctime).toLocaleDateString("zh-CN")}
+                  tags={matter.tags}
+                />
+              );
+            })}
         </div>
         <AboutMe />
       </div>

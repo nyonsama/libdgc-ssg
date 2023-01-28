@@ -1,29 +1,34 @@
-export interface GetStaticDataContext {
-  /** @description equals to `location.pathname` in browser */
-  path: string;
-  // 有必要的话可以把querystring也加进来
+import { LoaderFunction } from "react-router-dom";
+
+const pagePathToJsonPath = (pathname: string) => {
+  if (pathname === "/") {
+    return "/_data/index.json";
+  } else {
+    return `/_data${pathname.replace(/\/$/, "")}.json`;
+  }
+};
+
+export const staticDataLoader: LoaderFunction = ({ request }) => {
+  const pathname = new URL(request.url).pathname;
+  return fetch(pagePathToJsonPath(pathname));
+};
+
+// 不实现url params，因为没办法导出成单独的html文件
+
+interface PathBase {
+  name: string;
+  children?: PathTree[] | (() => Promise<PathTree[]>);
 }
-export type GetStaticData<T> = (context: GetStaticDataContext) => Promise<T>;
 
-// todo: 可以考虑加个index:boolean，或者手动给path加trailling slash
-type RouteInfo =
-  | {
-      type: "page";
-      getStaticData?: GetStaticData<any>;
-      children?: SSGRoutes[] | (() => Promise<SSGRoutes[]>);
-    }
-  | {
-      type: "dummy";
-      children?: SSGRoutes[] | (() => Promise<SSGRoutes[]>);
-    }
-  | {
-      type: "asset";
-      dirPath: string;
-    };
+interface PagePath extends PathBase {
+  type: "page";
+}
+interface DummyPath extends PathBase {
+  type: "dummy";
+}
+interface AssetPath extends PathBase {
+  type: "asset";
+  filePath: string;
+}
 
-export type SSGRoutes = {
-  path: string;
-  // children?: SSGRoutes[] | (() => Promise<SSGRoutes[]>);
-} & RouteInfo;
-
-export type GetStaticPaths = () => Promise<SSGRoutes[]>;
+export type PathTree = PagePath | DummyPath | AssetPath;
